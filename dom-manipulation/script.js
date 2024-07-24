@@ -20,7 +20,7 @@ function createAddQuoteForm(quote) {
 
     // Store this quote as the latest viewed quote
     // in session stroage
-    sessionStorage.setItem("lastViewedQuote", JSON.stringify(randomQuote))
+    sessionStorage.setItem("lastViewedQuote", JSON.stringify(quote))
 }
 
 function addQuote() {
@@ -202,6 +202,92 @@ function restoreAndSaveLastSelectedFilter() {
     }
 }
 
+async function fetchQuotesFromServer() {
+    try {
+        const response = await fetch("https://jsonplaceholder.typicode.com/posts");
+        const posts = await response.json();
+        return posts
+    } catch(error) {
+        console.error("Error fetching data:", error)
+    }
+}
+
+async function postData() {
+    const url = "https://jsonplaceholder.typicode.com/posts";
+    const options = {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            title: "Work",
+            body: "The only way to do great work is to love what you do.",
+            category: "Motivational"
+        })
+    }
+
+    try {
+        const response = await fetch(url, options)
+        const data = await response.json();
+        console.log("data after posting =====>", data)
+    } catch(error) {
+        console.error("Error posting data:", error)
+    }
+}
+
+function syncQuotes() {
+    setInterval(async () => {
+        const posts = await fetchQuotesFromServer();
+
+        const randomIdx = Math.floor(Math.random() * 10 );
+        // Format quotes.
+        const randomQuotes = posts
+          .slice(randomIdx, randomIdx*2)
+          .map(post => {
+            return {
+                text: post.body,
+                category: post.title.slice(0, 7),
+            }
+        })
+
+        // Update quotes in localStorage.
+        localStorage.setItem("quotes", JSON.stringify(randomQuotes));
+
+        // Notify the user.
+        document.getElementById("notificationMsg")
+          .textContent = "Quotes synced with server!";
+
+        // Wait for 1 second;
+        await new Promise((res) => setTimeout(res, 1000));
+
+        // Remvoe the notification msg.
+        document.getElementById("notificationMsg")
+          .textContent = "";
+
+
+        // Empty dropdown categories and quotes in the table.
+        document.getElementById("categoryFilter")
+          .innerHTML = `<option value="all">All Categories</option>`;
+        document.querySelector("#quotesTable > tbody")
+          .innerHTML = null
+
+        // Add category options
+        populateCategories(randomQuotes);
+
+        // Restore and aave last selected filter before filtering quotes
+        restoreAndSaveLastSelectedFilter()
+
+        // Update the quotes with the latest fetched data from the server.
+        quotes.splice(0, quotes.length)
+        quotes.push(...randomQuotes);
+
+        // Filter Quotes and show them.
+        filterQuotes()
+
+        //////////////////////////////////////////////////////////////////////
+    }, 4000)
+}
+
 window.addEventListener("DOMContentLoaded", () => {
     const newQuoteBtn = document.getElementById("newQuote");
     const exportToJSONBtn = document.getElementById("exportToJSON");
@@ -218,4 +304,10 @@ window.addEventListener("DOMContentLoaded", () => {
     // At first show all quotes because,
     // the "select quote" default value is "all".
     filterQuotes()
+
+    // Post data to the server.
+    postData()
+
+    // Periodically fetch data and update the local storage accordingly.
+    syncQuotes();
 })
